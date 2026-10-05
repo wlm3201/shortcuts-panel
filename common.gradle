@@ -1,0 +1,72 @@
+// 每个 MC 版本子项目共用的一份配置。
+// 使用前需要先设置：project.ext.minecraft_version / fabric_api_version
+
+base {
+	archivesName = "shortcuts-panel-${project.minecraft_version}"
+}
+
+repositories {
+	maven {
+		name = 'Modrinth'
+		url = 'https://api.modrinth.com/maven'
+	}
+}
+
+loom {
+	splitEnvironmentSourceSets()
+
+	mods {
+		"shortcuts-panel" {
+			sourceSet sourceSets.main
+			sourceSet sourceSets.client
+		}
+	}
+}
+
+// 共享源码在根项目 src/ 下，子项目只放版本专属的 compat 实现
+sourceSets {
+	main {
+		java.srcDirs += rootProject.file('src/main/java')
+		resources.srcDirs += rootProject.file('src/main/resources')
+	}
+	client {
+		java.srcDirs += rootProject.file('src/client/java')
+	}
+}
+
+// 直接改 KeyMapping 内部字段触发绑定（见 BindTrigger）
+loom {
+	accessWidenerPath = rootProject.file('src/main/resources/shortcuts-panel.accesswidener')
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+	// Loom 1.18 会自动重映射普通依赖，不再需要 modImplementation
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+}
+
+// 值先取出来，避免闭包在执行期引用 project（会破坏 configuration cache）
+def modVersion = project.version
+def mcVersion = project.minecraft_version
+
+processResources {
+	inputs.property "version", modVersion
+	inputs.property "minecraft_version", mcVersion
+
+	filesMatching("fabric.mod.json") {
+		expand "version": modVersion, "minecraft_version": mcVersion
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+}
+
+java {
+	withSourcesJar()
+
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
