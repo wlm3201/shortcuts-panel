@@ -1,0 +1,23 @@
+pluginManagement {
+	repositories {
+		maven {
+			name = 'Fabric'
+			url = 'https://maven.fabricmc.net/'
+		}
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
+rootProject.name = 'shortcuts-panel'
+
+// 共享源码在根项目 src/ 下，各 MC 版本的子项目放在 versions/ 里，
+// 只提供自己的 GameCompatImpl
+include ':v26_1_2'
+project(':v26_1_2').projectDir = file('versions/v26_1_2')
+
+include ':v26_2'
+project(':v26_2').projectDir = file('versions/v26_2')
+
+include ':v26_3'
+project(':v26_3').projectDir = file('versions/v26_3')

@@ -1,0 +1,23 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+	id 'maven-publish'
+}
+
+ext.minecraft_version = '26.1.2'
+ext.fabric_api_version = '0.155.3+26.1.2'
+
+apply from: rootProject.file('common.gradle')
+
+// 仅开发时用的依赖：方便在 runClient 里验证 MaLiLib 快捷键桥接。
+// runtimeOnly 不会被打进产物 jar（只有 include 才会 jar-in-jar）
+dependencies {
+	runtimeOnly "maven.modrinth:malilib:0.28.12"
+}
+
+loom {
+	runs {
+		client {
+			programArgs("--width", "1920", "--height", "1080")
+		}
+	}
+}

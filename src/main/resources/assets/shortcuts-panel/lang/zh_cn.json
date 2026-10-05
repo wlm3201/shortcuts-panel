@@ -1,0 +1,17 @@
+{
+  "key.shortcuts_panel.open": "打开快捷键面板",
+  "screen.shortcuts_panel": "快捷键",
+  "shortcuts_panel.search.hint": "搜索按键绑定...",
+  "shortcuts_panel.bound.shown": "已绑定",
+  "shortcuts_panel.bound.hidden": "已绑定",
+  "shortcuts_panel.excluded": "已排除",
+  "shortcuts_panel.favorites": "收藏 (%s)",
+  "shortcuts_panel.history": "历史 (%s)",
+  "shortcuts_panel.history.empty": "还没有触发记录",
+  "shortcuts_panel.favorites.empty": "点击条目行尾的 ★ 添加收藏",
+  "shortcuts_panel.empty": "没有匹配的按键绑定",
+  "shortcuts_panel.capture.title": "绑定：%s",
+  "shortcuts_panel.capture.hint": "按下要绑定的按键（Esc 设为无）",
+  "shortcuts_panel.clear": "清空",
+  "shortcuts_panel.clear.confirm": "再点一次确认清空"
+}

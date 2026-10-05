@@ -1,0 +1,17 @@
+{
+  "key.shortcuts_panel.open": "Open Shortcuts Panel",
+  "screen.shortcuts_panel": "Shortcuts",
+  "shortcuts_panel.search.hint": "Search keybinds...",
+  "shortcuts_panel.bound.shown": "Bound",
+  "shortcuts_panel.bound.hidden": "Bound",
+  "shortcuts_panel.excluded": "Excluded",
+  "shortcuts_panel.favorites": "Favorites (%s)",
+  "shortcuts_panel.history": "Recent (%s)",
+  "shortcuts_panel.history.empty": "Nothing triggered yet",
+  "shortcuts_panel.favorites.empty": "Click ★ on an entry to add",
+  "shortcuts_panel.empty": "No matching keybinds",
+  "shortcuts_panel.capture.title": "Bind: %s",
+  "shortcuts_panel.capture.hint": "Press a key to bind (Esc to unbind)",
+  "shortcuts_panel.clear": "Clear",
+  "shortcuts_panel.clear.confirm": "Click again to confirm"
+}

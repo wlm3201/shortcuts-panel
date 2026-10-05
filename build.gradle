@@ -1,0 +1,5 @@
+// 根项目不直接出 jar：各 MC 版本的构建在 v26_1_2 / v26_2 / v26_3 子项目里，
+// 它们共用 shared/ 下的源码，只额外提供自己的 GameCompatImpl。
+tasks.register('buildAll') {
+	dependsOn subprojects.collect { it.tasks.named('build') }
+}

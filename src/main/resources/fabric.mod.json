@@ -1,0 +1,29 @@
+{
+	"schemaVersion": 1,
+	"id": "shortcuts-panel",
+	"version": "${version}",
+	"name": "Shortcuts Panel",
+	"description": "A searchable command palette for every keybind (vanilla and modded), with history and favorites.",
+	"authors": [
+		"wlm3201"
+	],
+	"contact": {},
+	"license": "CC0-1.0",
+	"icon": "assets/shortcuts-panel/icon.png",
+	"accessWidener": "shortcuts-panel.accesswidener",
+	"environment": "client",
+	"entrypoints": {
+		"main": [
+			"com.shortcutspanel.ShortcutsPanel"
+		],
+		"client": [
+			"com.shortcutspanel.client.ShortcutsPanelClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~${minecraft_version}",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
