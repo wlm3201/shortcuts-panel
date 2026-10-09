@@ -11,7 +11,7 @@
   "shortcuts_panel.favorites.empty": "Click ★ on an entry to add",
   "shortcuts_panel.empty": "No matching keybinds",
   "shortcuts_panel.capture.title": "Bind: %s",
-  "shortcuts_panel.capture.hint": "Press a key to bind (Esc to unbind)",
+  "shortcuts_panel.capture.hint": "Press a key or mouse button (Esc to unbind)",
   "shortcuts_panel.clear": "Clear",
   "shortcuts_panel.clear.confirm": "Click again to confirm"
 }

@@ -7,7 +7,8 @@ import java.util.Locale;
 
 /**
  * 一条可被搜索的按键绑定记录。搜索关键字同时覆盖：翻译后的显示名、原始
- * 翻译键（如 {@code key.inventory}）以及翻译后的类别名。
+ * 翻译键（如 {@code key.inventory}）以及翻译后的类别名。搜索词可按空白切分成
+ * 多个关键词，每个关键词可分别命中上面任意一个字段（详见 {@link #score}）。
  *
  * <p>来源有两种：原版 / 其它 mod 注册的 {@link KeyMapping}，以及 MaLiLib 系的
  * {@code IHotkey}（后者不走原版 KeyMapping，见 {@link MalilibBridge}）。
@@ -96,14 +97,33 @@ public final class BindEntry {
     }
 
     /**
+     * 支持一次性搜多个字段：搜索词按空白切分成若干关键词，关键词之间是“与”
+     * 的关系，每个关键词可以分别命中名称、id 或类别中的任意一个。
+     * 例如 {@code "调试 区块"} 可以同时命中类别“调试”和名称里的“区块”，
+     * {@code "twe 配置"} 可以命中 Tweakeroo 的“打开配置界面”。
+     *
      * @return 0 表示不匹配，越大越靠前
      */
     public int score(String query) {
-        int best = 0;
-        best = Math.max(best, match(this.searchName, query) * 3);
-        best = Math.max(best, match(this.searchId, query) * 2);
-        best = Math.max(best, match(this.searchCategory, query));
-        return best;
+        String[] tokens = tokenize(query);
+        if (tokens.length == 0) return 0;
+
+        int total = 0;
+        for (String token : tokens) {
+            int best = Math.max(match(this.searchName, token) * 3,
+                    Math.max(match(this.searchId, token) * 2, match(this.searchCategory, token)));
+            // 每个关键词都必须至少命中一个字段，否则整条不匹配
+            if (best == 0) return 0;
+            total += best;
+        }
+        return total;
+    }
+
+    /** 按空白（含全角空格）切词并小写化，空词返回空数组 */
+    private static String[] tokenize(String query) {
+        String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) return new String[0];
+        return normalized.split("[\\s\\u3000]+");
     }
 
     private static int match(String text, String query) {

@@ -72,6 +72,10 @@ public final class EditBoxComponent extends UIComponent {
     }
 
     public void setValue(String value) {
+        // 先把几何同步进去：原版 EditBox 的显示起点（displayPos）是按"当时的宽度"算的，
+        // 组件还没布过局时宽度是 0，算出来的显示区间是空串——文本画不出来，
+        // 要等玩家点一下触发重算才出现。
+        this.syncGeometry();
         this.box.setValue(value == null ? "" : value);
         // 必须再动一下光标：原版 EditBox 靠它重算显示起点，
         // 光 setValue 的话文本可能还是画不出来（要等下一次交互才出现）
@@ -87,8 +91,14 @@ public final class EditBoxComponent extends UIComponent {
         return this.focused;
     }
 
-    /** 选中全部（Ctrl+A 之外的入口，比如调试） */
+    /**
+     * 选中全部（Ctrl+A 之外的入口）。
+     *
+     * <p>重开面板时用它把回填的搜索词全选：直接打字就整段覆盖，
+     * 不动它也还能接着看上次的结果（原版 EditBox 的 insertText 会替换选区）。
+     */
     public void selectAll() {
+        this.syncGeometry();
         this.box.moveCursorTo(0, false);
         this.box.moveCursorTo(this.getValue().length(), true);
     }
@@ -106,14 +116,19 @@ public final class EditBoxComponent extends UIComponent {
         return true;
     }
 
-    @Override
-    protected void drawSelf(UiGraphics context, int mouseX, int mouseY) {
-        // 每帧同步一次位置：原版 EditBox 内部靠自己的坐标算文本与光标。
+    /** 把组件当前的几何同步给内部 EditBox，每帧画之前和 setValue 之前都要做一次 */
+    private void syncGeometry() {
         // 注意要用这几个单独的 setter，EditBox 把 setRectangle 重写成了别的语义。
         this.box.setX(this.x);
         this.box.setY(this.y + this.textOffset());
         this.box.setWidth(this.width);
         this.box.setHeight(this.height);
+    }
+
+    @Override
+    protected void drawSelf(UiGraphics context, int mouseX, int mouseY) {
+        // 每帧同步一次位置：原版 EditBox 内部靠自己的坐标算文本与光标。
+        this.syncGeometry();
         this.box.paint(context.vanilla(), mouseX, mouseY, 0f);
     }
 
