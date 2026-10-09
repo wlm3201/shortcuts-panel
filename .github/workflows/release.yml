@@ -30,12 +30,11 @@ jobs:
       - name: Build all versions
         run: ./gradlew buildAll --no-daemon
 
-      # 26.3 仍是实验性支持（上游生态不全），先不发布
       - name: Stage artifacts
         run: |
           mkdir -p dist
           find versions -path '*build/libs/*' \
-            -name '*.jar' ! -name '*-sources.jar' ! -path '*v26_3*' \
+            -name '*.jar' ! -name '*-sources.jar' \
             -exec cp {} dist/ \;
           ls -l dist
 

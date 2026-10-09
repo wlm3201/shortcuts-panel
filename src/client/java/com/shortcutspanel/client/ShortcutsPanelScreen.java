@@ -79,18 +79,29 @@ public final class ShortcutsPanelScreen extends UiScreen {
     /** 临时诊断：布局尺寸只打一次 */
     private boolean loggedLayout;
 
-    /** 重建 UI 后要还原的搜索词（改键界面返回时用） */
-    private String retainedQuery = "";
+    /**
+     * 搜索词。静态：跨开关面板也保留（内存级，不落盘），重开面板时回填并全选。
+     *
+     * <p>两个用途：一是 UI 重建（改键界面返回、窗口尺寸变化）后把词放回去，
+     * 二是关掉面板再开时连同 {@link #retainedScroll} 一起还原上次的结果与滚动位置。
+     */
+    private static String retainedQuery = "";
     /**
      * 关面板时记住的结果栏滚动位置，下次开面板还原；-1 表示没有。只在内存里，不落盘。
      * 只在"整个 UI 被重建"时用：{@link #removed} 写入，{@link #init} 交给 pendingScroll、
      * 最后由 {@link #build} 还原。普通的刷新不走它——它不跟着滚动实时更新，
      * 每次刷新都拿它覆盖当前位置的话，列表会被拉回上次记住的地方（看起来就是"回顶"）。
      *
-     * <p>只在搜索框为空时有效：有搜索词时结果是筛出来的，而下次开面板搜索框是空的、
-     * 结果完全不同，还原那个位置没有意义（该回顶部）。
+     * <p>搜索词现在也一起保留，所以结果集是同一批，不再像以前那样只在搜索框为空时才记。
      */
     private static double retainedScroll = -1;
+    /**
+     * 只在新开面板时为 true：{@link #build} 里据此把回填的搜索词全选。
+     * 窗口尺寸变化、从改键界面返回都属于"重建"，那时玩家可能正在输入，全选会一键抹掉他的词。
+     */
+    private boolean selectAllOnBuild;
+    /** 回填搜索词期间抑制 {@link #onQueryChanged} 的刷新，交给 build 的第一刷统一做 */
+    private boolean restoringQuery;
     /**
      * UI 重建前暂存的滚动位置，{@link #build} 里还原一次；-1 表示没有。
      * 与 retainedScroll 的区别：这个是"同一批结果、UI 重搭一遍"（窗口尺寸变化），
@@ -130,6 +141,22 @@ public final class ShortcutsPanelScreen extends UiScreen {
         root.child(this.buildSearchColumn());
         root.child(this.buildFavoritesColumn());
 
+        // 先走一遍布局：输入框要有了真实宽度，回填的文本才画得出来——
+        // 原版 EditBox 按"当时的宽度"算显示区间，宽度还是 0 时算出来是空串，
+        // 文本要等玩家点一下触发重算才出现。
+        this.relayout();
+
+        // 搜索词必须在第一次刷新之前回填：这一刷要是全量列表，等刷完再补上搜索词，
+        // 结果就被整批换掉了，下面 restorePendingScroll 恢复的位置也就白恢复了。
+        if (!retainedQuery.isEmpty()) {
+            this.restoringQuery = true;
+            this.searchBox.setValue(retainedQuery);
+            this.restoringQuery = false;
+            // 重开面板时全选：直接打字就覆盖掉，不动它也还能接着看上次的结果
+            if (this.selectAllOnBuild) this.searchBox.selectAll();
+        }
+        this.selectAllOnBuild = false;
+
         // 建 UI 时列表内容没变，只是重新搭一遍组件：保留滚动位置
         this.refreshAll(true);
         this.restorePendingScroll();
@@ -151,14 +178,18 @@ public final class ShortcutsPanelScreen extends UiScreen {
         // 滚动位置必然丢，所以要在重建之前暂存下来，等 build() 还原。
         // 这里不看搜索词：结果集没换，只是 UI 重搭，有词也要保留。
         // 新开面板时 resultScroll 还是 null，用的就是上次关面板记住的（可能是 -1 = 不还原）。
-        this.pendingScroll = this.resultScroll != null ? this.resultScroll.progress() : retainedScroll;
+        boolean freshOpen = this.resultScroll == null;
+        this.pendingScroll = freshOpen ? retainedScroll : this.resultScroll.progress();
+        this.selectAllOnBuild = freshOpen;
 
         super.init();
         if (this.searchBox == null) return;
 
-        // 改键界面返回会重新走 init（MC 的 setScreen 会重建），搜索框是新的，
-        // 这里把上次输入的词放回去
-        if (!this.retainedQuery.isEmpty()) this.searchBox.setValue(this.retainedQuery);
+        // 搜索框是新建的（UI 重建）时把上次输入的词放回去。
+        // 值一样就别设：EditBox.setValue 必定触发 onChanged，会白白把结果栏刷回顶部。
+        if (!retainedQuery.isEmpty() && !retainedQuery.equals(this.searchBox.getValue())) {
+            this.searchBox.setValue(retainedQuery);
+        }
         this.focusSearchBox();
     }
 
@@ -364,18 +395,22 @@ public final class ShortcutsPanelScreen extends UiScreen {
 
     /** 搜索词变了就记下来：改键界面返回、窗口尺寸变化都会重建 UI，不记就丢了 */
     private void onQueryChanged() {
-        this.retainedQuery = this.searchBox == null ? "" : this.searchBox.getValue();
+        retainedQuery = this.searchBox == null ? "" : this.searchBox.getValue();
+        // 回填搜索词时不要顺带刷列表：刷新由 build() 的第一刷统一负责，
+        // 这里再刷一次（走 refreshAll(false)）会把刚恢复的滚动位置冲掉
+        if (this.restoringQuery) return;
         // 结果整批换掉：回到顶部
         this.refreshAll(false);
     }
 
-    /** 关面板时记下滚动位置（内存级，不写配置） */
+    /** 关面板时记下搜索词与滚动位置（内存级，不写配置） */
     @Override
     public void removed() {
-        // 只在搜索框为空时记住：有搜索词时结果是筛出来的，下次开面板搜索框是空的、
-        // 结果完全不同，还原那个位置只会停在莫名其妙的地方，所以直接作废（-1 = 回顶部）。
-        boolean emptyQuery = this.searchBox != null && this.searchBox.getValue().isEmpty();
-        retainedScroll = this.resultScroll != null && emptyQuery ? this.resultScroll.progress() : -1;
+        // 以前只在搜索框为空时记位置：那时重开面板搜索词是空的、结果完全不同，
+        // 还原那个位置只会停在莫名其妙的地方。现在搜索词一起保留，结果集是一致的，
+        // 所以不管有没有搜索词都记。
+        retainedScroll = this.resultScroll != null ? this.resultScroll.progress() : -1;
+        if (this.searchBox != null) retainedQuery = this.searchBox.getValue();
         super.removed();
     }
 
@@ -707,8 +742,11 @@ public final class ShortcutsPanelScreen extends UiScreen {
         BindTrigger.request(entry);
     }
 
-    /** 打开按键捕获界面，把该条目绑到玩家按下的键上 */
+    /** 打开按键捕获界面，把该条目绑到玩家按下的键 / 鼠标键上 */
     public void startKeyCapture(BindEntry entry) {
+        // MaLiLib 系没有 KeyMapping，改不了键
+        if (entry == null || entry.isMalilib()) return;
+
         var client = Minecraft.getInstance();
         com.shortcutspanel.client.compat.Compat.get().setScreen(client, new KeyCaptureScreen(entry, this));
     }

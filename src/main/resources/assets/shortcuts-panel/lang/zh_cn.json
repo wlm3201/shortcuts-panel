@@ -11,7 +11,7 @@
   "shortcuts_panel.favorites.empty": "点击条目行尾的 ★ 添加收藏",
   "shortcuts_panel.empty": "没有匹配的按键绑定",
   "shortcuts_panel.capture.title": "绑定：%s",
-  "shortcuts_panel.capture.hint": "按下要绑定的按键（Esc 设为无）",
+  "shortcuts_panel.capture.hint": "按下要绑定的按键或鼠标键（Esc 设为无）",
   "shortcuts_panel.clear": "清空",
   "shortcuts_panel.clear.confirm": "再点一次确认清空"
 }

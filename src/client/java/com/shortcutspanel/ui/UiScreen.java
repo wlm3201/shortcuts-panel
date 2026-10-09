@@ -46,6 +46,10 @@ public abstract class UiScreen extends Screen {
 
     @Override
     protected void init() {
+        // 从子界面（改键）切回来会再走一遍 init。上一次按下时命中的组件已经不存在了，
+        // 不清的话后续松手会发给这个旧组件（尤其鼠标键：按下在子界面、松手在本界面）。
+        this.dragged = null;
+
         // MC 的 setScreen 会对目标 screen 重新走一遍 init（从改键界面返回就是这样）。
         // 窗口尺寸没变就别重建：否则搜索框内容、滚动位置、焦点全都会丢。
         if (this.root != null && this.lastWidth == this.width && this.lastHeight == this.height) {
