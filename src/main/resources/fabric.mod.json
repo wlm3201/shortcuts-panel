@@ -1,29 +1,27 @@
 {
 	"schemaVersion": 1,
-	"id": "shortcuts-panel",
+	"id": "shortcutspanel",
 	"version": "${version}",
 	"name": "Shortcuts Panel",
-	"description": "A searchable command palette for every keybind (vanilla and modded), with history and favorites.",
-	"authors": [
-		"wlm3201"
-	],
-	"contact": {},
-	"license": "CC0-1.0",
-	"icon": "assets/shortcuts-panel/icon.png",
-	"accessWidener": "shortcuts-panel.accesswidener",
+	"description": "A searchable palette for every keybind (vanilla and modded), with history, favorites and instant rebinding.",
+	"authors": ["wlm3201"],
+	"contact": {
+		"sources": "https://github.com/wlm3201/shortcuts-panel"
+	},
+	"license": "MIT",
+	"icon": "assets/shortcutspanel/icon.png",
 	"environment": "client",
 	"entrypoints": {
-		"main": [
-			"com.shortcutspanel.ShortcutsPanel"
-		],
-		"client": [
-			"com.shortcutspanel.client.ShortcutsPanelClient"
-		]
+		"client": ["com.shortcutspanel.client.ShortcutsPanelClient"]
 	},
+	"accessWidener": "shortcutspanel.accesswidener",
 	"depends": {
 		"fabricloader": ">=0.19.5",
-		"minecraft": "~${minecraft_version}",
 		"java": ">=25",
+		"minecraft": "${minecraft_dependency}",
 		"fabric-api": "*"
+	},
+	"suggests": {
+		"malilib": "*"
 	}
 }

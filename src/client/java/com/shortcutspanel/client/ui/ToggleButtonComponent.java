@@ -1,20 +1,19 @@
 package com.shortcutspanel.client.ui;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import com.shortcutspanel.ui.CursorStyle;
-import com.shortcutspanel.ui.UIComponent;
-import com.shortcutspanel.ui.UiGraphics;
+import com.shortcutspanel.client.uikit.CursorStyle;
+import com.shortcutspanel.client.uikit.UIComponent;
+import com.shortcutspanel.client.uikit.UiGraphics;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
-/** 扁平开关按钮：名称 + 激活时青绿描边 */
 public final class ToggleButtonComponent extends UIComponent {
 
     private Component label = Component.empty();
     private Runnable onPress = () -> {};
-    /** 打开状态：描边用强调色，和"仅仅悬停"区分开 */
+
     private boolean active;
 
     public ToggleButtonComponent() {
@@ -42,15 +41,28 @@ public final class ToggleButtonComponent extends UIComponent {
         int left = this.x();
         int top = this.y();
 
-        context.fill(left, top, left + this.width(), top + this.height(),
+        context.fill(
+                left,
+                top,
+                left + this.width(),
+                top + this.height(),
                 this.isHovered() ? Theme.BUTTON_HOVER : Theme.BUTTON);
-        context.outline(left, top, this.width(), this.height(),
+        context.outline(
+                left,
+                top,
+                this.width(),
+                this.height(),
                 (this.isHovered() || this.active) ? Theme.ACCENT : Theme.BORDER);
 
         String text = this.label.getString();
         int textX = left + (this.width() - font.width(text)) / 2;
-        context.text(font, text, textX, top + (this.height() - font.lineHeight) / 2 + 1,
-                this.active ? Theme.ACCENT : Theme.TEXT, true);
+        context.text(
+                font,
+                text,
+                textX,
+                top + (this.height() - font.lineHeight) / 2 + 1,
+                this.active ? Theme.ACCENT : Theme.TEXT,
+                true);
     }
 
     @Override

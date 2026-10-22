@@ -8,43 +8,36 @@ import com.shortcutspanel.client.data.IdListStore;
 import com.shortcutspanel.client.data.Settings;
 import com.shortcutspanel.client.ui.BindRowComponent;
 import com.shortcutspanel.client.ui.ClearButtonComponent;
+import com.shortcutspanel.client.ui.EditBoxComponent;
 import com.shortcutspanel.client.ui.FavoriteChipComponent;
 import com.shortcutspanel.client.ui.KeyCaptureScreen;
-import com.shortcutspanel.client.ui.EditBoxComponent;
 import com.shortcutspanel.client.ui.Theme;
 import com.shortcutspanel.client.ui.ToggleButtonComponent;
-import com.shortcutspanel.ui.Align;
-import com.shortcutspanel.ui.FlowLayout;
-import com.shortcutspanel.ui.Insets;
-import com.shortcutspanel.ui.LabelComponent;
-import com.shortcutspanel.ui.ParentComponent;
-import com.shortcutspanel.ui.ScrollContainer;
-import com.shortcutspanel.ui.Sizing;
-import com.shortcutspanel.ui.Surface;
-import com.shortcutspanel.ui.UIComponent;
-import com.shortcutspanel.ui.UiScreen;
+import com.shortcutspanel.client.uikit.Align;
+import com.shortcutspanel.client.uikit.FlowLayout;
+import com.shortcutspanel.client.uikit.Insets;
+import com.shortcutspanel.client.uikit.LabelComponent;
+import com.shortcutspanel.client.uikit.ParentComponent;
+import com.shortcutspanel.client.uikit.ScrollContainer;
+import com.shortcutspanel.client.uikit.Sizing;
+import com.shortcutspanel.client.uikit.Surface;
+import com.shortcutspanel.client.uikit.UIComponent;
+import com.shortcutspanel.client.uikit.UiScreen;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
-/**
- * 快捷键面板：历史栏 | 搜索栏 | 收藏栏，三栏横向排列。
- *
- * <p>UI 用自研的 {@code com.shortcutspanel.ui}，不依赖 owo-lib——
- * 见包内说明：owo 会被别的 mod 注入接口导致类加载冲突。
- */
 public final class ShortcutsPanelScreen extends UiScreen {
 
-    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger("shortcuts-panel");
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger("shortcutspanel");
 
     private static final int MAX_HISTORY = 40;
-    /** 按住 Alt 滚动时走这个倍率（VS Code 里 Alt+滚轮也是快速滚动） */
+
     private static final int ALT_SCROLL_FACTOR = 6;
 
     private final BindIndex index;
@@ -54,7 +47,7 @@ public final class ShortcutsPanelScreen extends UiScreen {
     private final Settings settings;
     private final List<BindEntry> results = new ArrayList<>();
     private final List<BindRowComponent> rows = new ArrayList<>();
-    /** 收藏栏：条目 id -> chip，方便单独增删而不重建整个列表（避免滚动位置丢失） */
+
     private final Map<String, FavoriteChipComponent> chips = new LinkedHashMap<>();
 
     private EditBoxComponent searchBox;
@@ -69,44 +62,23 @@ public final class ShortcutsPanelScreen extends UiScreen {
     private ToggleButtonComponent boundToggle;
     private ToggleButtonComponent malilibToggle;
     private ToggleButtonComponent excludedToggle;
-    /** 收藏栏为空时的提示，添加第一个收藏时要撤掉 */
+
     private LabelComponent favoritesHint;
-    /** 搜索框外层的输入框容器，聚焦时要把描边换成强调色 */
+
     private FlowLayout searchField;
 
-    /** 收藏栏里正在被拖动的项 */
     private FavoriteChipComponent dragChip;
-    /** 临时诊断：布局尺寸只打一次 */
+
     private boolean loggedLayout;
 
-    /**
-     * 搜索词。静态：跨开关面板也保留（内存级，不落盘），重开面板时回填并全选。
-     *
-     * <p>两个用途：一是 UI 重建（改键界面返回、窗口尺寸变化）后把词放回去，
-     * 二是关掉面板再开时连同 {@link #retainedScroll} 一起还原上次的结果与滚动位置。
-     */
     private static String retainedQuery = "";
-    /**
-     * 关面板时记住的结果栏滚动位置，下次开面板还原；-1 表示没有。只在内存里，不落盘。
-     * 只在"整个 UI 被重建"时用：{@link #removed} 写入，{@link #init} 交给 pendingScroll、
-     * 最后由 {@link #build} 还原。普通的刷新不走它——它不跟着滚动实时更新，
-     * 每次刷新都拿它覆盖当前位置的话，列表会被拉回上次记住的地方（看起来就是"回顶"）。
-     *
-     * <p>搜索词现在也一起保留，所以结果集是同一批，不再像以前那样只在搜索框为空时才记。
-     */
+
     private static double retainedScroll = -1;
-    /**
-     * 只在新开面板时为 true：{@link #build} 里据此把回填的搜索词全选。
-     * 窗口尺寸变化、从改键界面返回都属于"重建"，那时玩家可能正在输入，全选会一键抹掉他的词。
-     */
+
     private boolean selectAllOnBuild;
-    /** 回填搜索词期间抑制 {@link #onQueryChanged} 的刷新，交给 build 的第一刷统一做 */
+
     private boolean restoringQuery;
-    /**
-     * UI 重建前暂存的滚动位置，{@link #build} 里还原一次；-1 表示没有。
-     * 与 retainedScroll 的区别：这个是"同一批结果、UI 重搭一遍"（窗口尺寸变化），
-     * 与搜索词无关，必须保留；那个是"跨开关面板"，只有结果集相同才有意义。
-     */
+
     private double pendingScroll = -1;
 
     private boolean showBound;
@@ -131,38 +103,28 @@ public final class ShortcutsPanelScreen extends UiScreen {
 
     @Override
     protected void build(FlowLayout root) {
-        // 整个界面背景透明，只有各栏面板是半透明黑
         root.padding(Insets.of(Theme.PAD));
         root.gap(Theme.GAP);
-        // 三栏宽度合计不到 100%，主轴居中的话左右才对称
         root.mainAlignment(Align.Horizontal.CENTER);
 
         root.child(this.buildHistoryColumn());
         root.child(this.buildSearchColumn());
         root.child(this.buildFavoritesColumn());
 
-        // 先走一遍布局：输入框要有了真实宽度，回填的文本才画得出来——
-        // 原版 EditBox 按"当时的宽度"算显示区间，宽度还是 0 时算出来是空串，
-        // 文本要等玩家点一下触发重算才出现。
         this.relayout();
 
-        // 搜索词必须在第一次刷新之前回填：这一刷要是全量列表，等刷完再补上搜索词，
-        // 结果就被整批换掉了，下面 restorePendingScroll 恢复的位置也就白恢复了。
         if (!retainedQuery.isEmpty()) {
             this.restoringQuery = true;
             this.searchBox.setValue(retainedQuery);
             this.restoringQuery = false;
-            // 重开面板时全选：直接打字就覆盖掉，不动它也还能接着看上次的结果
             if (this.selectAllOnBuild) this.searchBox.selectAll();
         }
         this.selectAllOnBuild = false;
 
-        // 建 UI 时列表内容没变，只是重新搭一遍组件：保留滚动位置
         this.refreshAll(true);
         this.restorePendingScroll();
     }
 
-    /** 还原 UI 重建前暂存的滚动位置（开屏、窗口尺寸变化），只用一次 */
     private void restorePendingScroll() {
         double target = this.pendingScroll;
         this.pendingScroll = -1;
@@ -174,10 +136,6 @@ public final class ShortcutsPanelScreen extends UiScreen {
 
     @Override
     protected void init() {
-        // 窗口尺寸一变，super.init() 会重建整个 root，ScrollContainer 全是新的，
-        // 滚动位置必然丢，所以要在重建之前暂存下来，等 build() 还原。
-        // 这里不看搜索词：结果集没换，只是 UI 重搭，有词也要保留。
-        // 新开面板时 resultScroll 还是 null，用的就是上次关面板记住的（可能是 -1 = 不还原）。
         boolean freshOpen = this.resultScroll == null;
         this.pendingScroll = freshOpen ? retainedScroll : this.resultScroll.progress();
         this.selectAllOnBuild = freshOpen;
@@ -185,30 +143,27 @@ public final class ShortcutsPanelScreen extends UiScreen {
         super.init();
         if (this.searchBox == null) return;
 
-        // 搜索框是新建的（UI 重建）时把上次输入的词放回去。
-        // 值一样就别设：EditBox.setValue 必定触发 onChanged，会白白把结果栏刷回顶部。
         if (!retainedQuery.isEmpty() && !retainedQuery.equals(this.searchBox.getValue())) {
             this.searchBox.setValue(retainedQuery);
         }
         this.focusSearchBox();
     }
 
-    // ------------------------------------------------------------------ 布局
-
     private FlowLayout buildHistoryColumn() {
         var column = FlowLayout.vertical(Sizing.fill(Theme.HISTORY_PERCENT), Sizing.fill(100));
         column.gap(Theme.GAP);
 
-        // 表头高度与搜索行一致，三栏的面板顶部才会齐平。
-        // 用"占位 + 标题 + 按钮"三列：左右等宽，标题才仍然在整栏居中
         var headerRow = FlowLayout.horizontal(Sizing.fill(100), Sizing.fixed(Theme.ROW_HEIGHT));
         headerRow.verticalAlignment(Align.Vertical.CENTER).gap(4);
 
         var spacer = new LabelComponent(Component.empty());
         spacer.sizing(Sizing.fixed(Theme.CLEAR_BUTTON_WIDTH), Sizing.fixed(Theme.ROW_HEIGHT));
 
-        this.historyHeader = new LabelComponent(Component.empty())
-                .color(Theme.TEXT).shadow(true).align(Align.Horizontal.CENTER);
+        this.historyHeader =
+                new LabelComponent(Component.empty())
+                        .color(Theme.TEXT)
+                        .shadow(true)
+                        .align(Align.Horizontal.CENTER);
         this.historyHeader.sizing(Sizing.expand(), Sizing.fixed(Theme.ROW_HEIGHT));
 
         var clearHistory = new ClearButtonComponent().onConfirm(this::clearHistory);
@@ -222,7 +177,8 @@ public final class ShortcutsPanelScreen extends UiScreen {
         this.historyList = FlowLayout.vertical(Sizing.fill(100), Sizing.content());
         this.historyList.gap(2);
 
-        this.historyScroll = new ScrollContainer(Sizing.fill(100), Sizing.fill(100), this.historyList);
+        this.historyScroll =
+                new ScrollContainer(Sizing.fill(100), Sizing.fill(100), this.historyList);
         this.historyScroll.scrollbarColor(0x55FFFFFF);
 
         var panel = FlowLayout.vertical(Sizing.fill(100), Sizing.expand());
@@ -243,7 +199,8 @@ public final class ShortcutsPanelScreen extends UiScreen {
         this.resultList = FlowLayout.vertical(Sizing.fill(100), Sizing.content());
         this.resultList.gap(2);
 
-        this.resultScroll = new ScrollContainer(Sizing.fill(100), Sizing.fill(100), this.resultList);
+        this.resultScroll =
+                new ScrollContainer(Sizing.fill(100), Sizing.fill(100), this.resultList);
         this.resultScroll.scrollbarColor(0x55FFFFFF);
 
         var panel = FlowLayout.vertical(Sizing.fill(100), Sizing.expand());
@@ -255,39 +212,42 @@ public final class ShortcutsPanelScreen extends UiScreen {
         return column;
     }
 
-    /** 搜索行：输入框 + 三个过滤开关 */
     private FlowLayout buildSearchRow() {
         var searchRow = FlowLayout.horizontal(Sizing.fill(100), Sizing.fixed(Theme.ROW_HEIGHT));
         searchRow.gap(6).verticalAlignment(Align.Vertical.CENTER);
 
-        // expand()：先排固定宽度的按钮，输入框吃掉剩下的空间
         var field = FlowLayout.horizontal(Sizing.expand(), Sizing.fixed(Theme.ROW_HEIGHT));
         field.surface(Surface.flat(Theme.FIELD).and(Surface.outline(Theme.BORDER)));
         field.padding(Insets.of(0, 0, 8, 0));
         this.searchField = field;
 
-        // 直接包原版 EditBox：输入法、选区、Ctrl+A、双击选词都是原版行为
-        this.searchBox = new EditBoxComponent()
-                .hint(Component.translatable("shortcuts_panel.search.hint"))
-                .onChanged(this::onQueryChanged)
-                .onFocusChanged(this::updateSearchFocus);
+        this.searchBox =
+                new EditBoxComponent()
+                        .hint(Component.translatable("shortcuts_panel.search.hint"))
+                        .onChanged(this::onQueryChanged)
+                        .onFocusChanged(this::updateSearchFocus);
         this.searchBox.sizing(Sizing.fill(100), Sizing.fill(100));
         field.child(this.searchBox);
 
-        this.boundToggle = new ToggleButtonComponent()
-                .onPress(this::toggleBoundFilter)
-                .label(Component.empty());
-        this.boundToggle.sizing(Sizing.fixed(Theme.FILTER_BUTTON_WIDTH), Sizing.fixed(Theme.ROW_HEIGHT));
+        this.boundToggle =
+                new ToggleButtonComponent()
+                        .onPress(this::toggleBoundFilter)
+                        .label(Component.empty());
+        this.boundToggle.sizing(
+                Sizing.fixed(Theme.FILTER_BUTTON_WIDTH), Sizing.fixed(Theme.ROW_HEIGHT));
 
-        this.malilibToggle = new ToggleButtonComponent()
-                .onPress(this::toggleMalilib)
-                .label(Component.literal("MaLiLib"));
+        this.malilibToggle =
+                new ToggleButtonComponent()
+                        .onPress(this::toggleMalilib)
+                        .label(Component.literal("MaLiLib"));
         this.malilibToggle.sizing(Sizing.fixed(44), Sizing.fixed(Theme.ROW_HEIGHT));
 
-        this.excludedToggle = new ToggleButtonComponent()
-                .onPress(this::toggleExcludedFilter)
-                .label(Component.translatable("shortcuts_panel.excluded"));
-        this.excludedToggle.sizing(Sizing.fixed(Theme.FILTER_BUTTON_WIDTH), Sizing.fixed(Theme.ROW_HEIGHT));
+        this.excludedToggle =
+                new ToggleButtonComponent()
+                        .onPress(this::toggleExcludedFilter)
+                        .label(Component.translatable("shortcuts_panel.excluded"));
+        this.excludedToggle.sizing(
+                Sizing.fixed(Theme.FILTER_BUTTON_WIDTH), Sizing.fixed(Theme.ROW_HEIGHT));
 
         searchRow.child(field);
         searchRow.child(this.boundToggle);
@@ -300,19 +260,22 @@ public final class ShortcutsPanelScreen extends UiScreen {
         var column = FlowLayout.vertical(Sizing.fill(Theme.FAVORITES_PERCENT), Sizing.fill(100));
         column.gap(Theme.GAP);
 
-        // 表头高度与搜索行一致，三栏的面板顶部才会齐平
         var headerRow = FlowLayout.horizontal(Sizing.fill(100), Sizing.fixed(Theme.ROW_HEIGHT));
         headerRow.verticalAlignment(Align.Vertical.CENTER).gap(4);
 
         var spacer = new LabelComponent(Component.empty());
         spacer.sizing(Sizing.fixed(Theme.CLEAR_BUTTON_WIDTH), Sizing.fixed(Theme.ROW_HEIGHT));
 
-        this.favoritesHeader = new LabelComponent(Component.empty())
-                .color(Theme.TEXT).shadow(true).align(Align.Horizontal.CENTER);
+        this.favoritesHeader =
+                new LabelComponent(Component.empty())
+                        .color(Theme.TEXT)
+                        .shadow(true)
+                        .align(Align.Horizontal.CENTER);
         this.favoritesHeader.sizing(Sizing.expand(), Sizing.fixed(Theme.ROW_HEIGHT));
 
         var clearFavorites = new ClearButtonComponent().onConfirm(this::clearFavorites);
-        clearFavorites.sizing(Sizing.fixed(Theme.CLEAR_BUTTON_WIDTH), Sizing.fixed(Theme.ROW_HEIGHT));
+        clearFavorites.sizing(
+                Sizing.fixed(Theme.CLEAR_BUTTON_WIDTH), Sizing.fixed(Theme.ROW_HEIGHT));
 
         headerRow.child(spacer);
         headerRow.child(this.favoritesHeader);
@@ -322,7 +285,8 @@ public final class ShortcutsPanelScreen extends UiScreen {
         this.favoritesList = FlowLayout.vertical(Sizing.fill(100), Sizing.content());
         this.favoritesList.gap(4);
 
-        this.favoritesScroll = new ScrollContainer(Sizing.fill(100), Sizing.fill(100), this.favoritesList);
+        this.favoritesScroll =
+                new ScrollContainer(Sizing.fill(100), Sizing.fill(100), this.favoritesList);
         this.favoritesScroll.scrollbarColor(0x55FFFFFF);
 
         var panel = FlowLayout.vertical(Sizing.fill(100), Sizing.expand());
@@ -334,24 +298,13 @@ public final class ShortcutsPanelScreen extends UiScreen {
         return column;
     }
 
-    // ------------------------------------------------------------------ 刷新
-
-    /**
-     * 列表内容没变的重建（右键排除、改键返回……）：三栏都保留滚动位置。
-     */
     public void refreshAll() {
         this.refreshAll(true);
     }
 
-    /**
-     * 重建三栏列表。
-     *
-     * @param keepScroll true = 保留当前滚动位置；false = 三栏都回到顶部（结果整批换掉时用）
-     */
     private void refreshAll(boolean keepScroll) {
         this.refresh(keepScroll);
         this.refreshHistory(keepScroll);
-        // 收藏栏也跟着搜索词过滤
         this.rebuildFavorites(keepScroll);
     }
 
@@ -361,12 +314,11 @@ public final class ShortcutsPanelScreen extends UiScreen {
 
         this.results.clear();
         this.results.addAll(found);
-        // 换搜索词/过滤条件后结果整批换掉了，选中项跟着回到第一条，
-        // 否则会"滚到顶了但高亮还停在第 N 项"
         if (!keepScroll) this.selected = 0;
         this.selected = Mth.clamp(this.selected, 0, Math.max(0, this.results.size() - 1));
 
-        double progress = keepScroll && this.resultScroll != null ? this.resultScroll.progress() : 0;
+        double progress =
+                keepScroll && this.resultScroll != null ? this.resultScroll.progress() : 0;
 
         this.rows.clear();
         this.resultList.clearChildren();
@@ -393,39 +345,28 @@ public final class ShortcutsPanelScreen extends UiScreen {
         }
     }
 
-    /** 搜索词变了就记下来：改键界面返回、窗口尺寸变化都会重建 UI，不记就丢了 */
     private void onQueryChanged() {
         retainedQuery = this.searchBox == null ? "" : this.searchBox.getValue();
-        // 回填搜索词时不要顺带刷列表：刷新由 build() 的第一刷统一负责，
-        // 这里再刷一次（走 refreshAll(false)）会把刚恢复的滚动位置冲掉
         if (this.restoringQuery) return;
-        // 结果整批换掉：回到顶部
         this.refreshAll(false);
     }
 
-    /** 关面板时记下搜索词与滚动位置（内存级，不写配置） */
     @Override
     public void removed() {
-        // 以前只在搜索框为空时记位置：那时重开面板搜索词是空的、结果完全不同，
-        // 还原那个位置只会停在莫名其妙的地方。现在搜索词一起保留，结果集是一致的，
-        // 所以不管有没有搜索词都记。
         retainedScroll = this.resultScroll != null ? this.resultScroll.progress() : -1;
         if (this.searchBox != null) retainedQuery = this.searchBox.getValue();
         super.removed();
     }
 
-    /** 清空最近触发记录 */
     private void clearHistory() {
         var store = ShortcutsPanelClient.HISTORY;
         if (store == null) return;
 
         for (String id : new ArrayList<>(store.ids())) store.remove(id);
         store.save();
-        // 只动了历史栏，结果栏/收藏栏内容没变：位置保留
         this.refreshAll(true);
     }
 
-    /** 清空收藏 */
     private void clearFavorites() {
         var store = ShortcutsPanelClient.FAVORITES;
         if (store == null) return;
@@ -437,7 +378,8 @@ public final class ShortcutsPanelScreen extends UiScreen {
 
     private void refreshHistory(boolean keepScroll) {
         String query = this.searchBox == null ? "" : this.searchBox.getValue();
-        double progress = keepScroll && this.historyScroll != null ? this.historyScroll.progress() : 0;
+        double progress =
+                keepScroll && this.historyScroll != null ? this.historyScroll.progress() : 0;
 
         this.historyList.clearChildren();
 
@@ -463,7 +405,8 @@ public final class ShortcutsPanelScreen extends UiScreen {
     }
 
     private void rebuildFavorites(boolean keepScroll) {
-        double progress = keepScroll && this.favoritesScroll != null ? this.favoritesScroll.progress() : 0;
+        double progress =
+                keepScroll && this.favoritesScroll != null ? this.favoritesScroll.progress() : 0;
         String query = this.searchBox == null ? "" : this.searchBox.getValue();
 
         this.favoritesList.clearChildren();
@@ -493,7 +436,6 @@ public final class ShortcutsPanelScreen extends UiScreen {
     private void addChip(BindEntry entry) {
         if (this.chips.containsKey(entry.id())) return;
 
-        // 收藏第一个时把空状态提示撤掉
         if (this.favoritesHint != null) {
             this.favoritesList.removeChild(this.favoritesHint);
             this.favoritesHint = null;
@@ -509,7 +451,6 @@ public final class ShortcutsPanelScreen extends UiScreen {
         var chip = this.chips.remove(entry.id());
         if (chip != null) this.favoritesList.removeChild(chip);
 
-        // 收藏清空了要把空状态提示放回来
         if (this.favoritesList.children().isEmpty()) {
             this.favoritesHint = dimLabel("shortcuts_panel.favorites.empty");
             this.favoritesList.child(this.favoritesHint);
@@ -525,9 +466,10 @@ public final class ShortcutsPanelScreen extends UiScreen {
 
     private void updateBoundToggle() {
         if (this.boundToggle == null) return;
-        this.boundToggle.label(this.showBound
-                ? Component.translatable("shortcuts_panel.bound.shown")
-                : Component.translatable("shortcuts_panel.bound.hidden"));
+        this.boundToggle.label(
+                this.showBound
+                        ? Component.translatable("shortcuts_panel.bound.shown")
+                        : Component.translatable("shortcuts_panel.bound.hidden"));
         this.boundToggle.active(this.showBound);
     }
 
@@ -535,7 +477,6 @@ public final class ShortcutsPanelScreen extends UiScreen {
         this.showBound = !this.showBound;
         this.settings.showBound(this.showBound);
         this.settings.save();
-        // 过滤条件变了 = 换了一批结果：回到顶部
         this.refreshAll(false);
     }
 
@@ -548,9 +489,7 @@ public final class ShortcutsPanelScreen extends UiScreen {
         this.showMalilib = !this.showMalilib;
         this.settings.showMalilib(this.showMalilib);
         this.settings.save();
-        // 索引层的过滤要跟着改，否则要重开面板才生效
         this.index.includeMalilib(this.showMalilib);
-        // 过滤条件变了 = 换了一批结果：回到顶部
         this.refreshAll(false);
     }
 
@@ -564,7 +503,6 @@ public final class ShortcutsPanelScreen extends UiScreen {
         this.settings.showExcluded(this.showExcluded);
         this.settings.save();
         this.index.excluded(this.excluded.ids(), this.showExcluded);
-        // 过滤条件变了 = 换了一批结果：回到顶部
         this.refreshAll(false);
     }
 
@@ -581,7 +519,6 @@ public final class ShortcutsPanelScreen extends UiScreen {
         this.revealSelected();
     }
 
-    /** 鼠标划过某行时同步选中项，避免"划到第 5 项、回车却触发第 1 项" */
     public void selectRow(BindRowComponent row) {
         int index = this.rows.indexOf(row);
         if (index < 0 || index == this.selected) return;
@@ -589,7 +526,6 @@ public final class ShortcutsPanelScreen extends UiScreen {
         this.updateSelection();
     }
 
-    /** 只有当选中项滚出可视区时才滚动 —— 每按一次方向键都滚会让列表一直跳 */
     private void revealSelected() {
         if (this.resultScroll == null) return;
 
@@ -598,15 +534,11 @@ public final class ShortcutsPanelScreen extends UiScreen {
         int viewBottom = viewTop + this.resultScroll.innerHeight();
         if (row.y() >= viewTop && row.y() + row.height() <= viewBottom) return;
 
-        double delta = row.y() < viewTop
-                ? row.y() - viewTop
-                : row.y() + row.height() - viewBottom;
+        double delta = row.y() < viewTop ? row.y() - viewTop : row.y() + row.height() - viewBottom;
 
         this.resultScroll.scrollTo(this.resultScroll.scrollOffset() + delta);
         this.relayout();
     }
-
-    // ------------------------------------------------- 供子组件回调的公共方法
 
     public boolean isFavorite(BindEntry entry) {
         return this.favorites.contains(entry.id());
@@ -616,14 +548,12 @@ public final class ShortcutsPanelScreen extends UiScreen {
         return this.excluded.contains(entry.id());
     }
 
-    /** 结果行右键：把条目永久排除（再右键一次放回来） */
     public void toggleExcluded(BindEntry entry) {
         if (!this.excluded.remove(entry.id())) {
             this.excluded.add(entry.id());
         }
         this.excluded.save();
         this.index.excluded(this.excluded.ids(), this.showExcluded);
-        // 只是某一行的排除态变了（显示已排除关闭时还会少一行），列表整体没换：保留滚动位置
         this.refreshAll(true);
     }
 
@@ -638,7 +568,8 @@ public final class ShortcutsPanelScreen extends UiScreen {
         }
         this.favorites.save();
 
-        this.favoritesHeader.text(Component.translatable("shortcuts_panel.favorites", this.chips.size()));
+        this.favoritesHeader.text(
+                Component.translatable("shortcuts_panel.favorites", this.chips.size()));
         if (this.favoritesScroll != null) {
             this.relayout();
             this.favoritesScroll.restore(progress);
@@ -652,14 +583,14 @@ public final class ShortcutsPanelScreen extends UiScreen {
         this.favorites.save();
         this.removeChip(entry);
 
-        this.favoritesHeader.text(Component.translatable("shortcuts_panel.favorites", this.chips.size()));
+        this.favoritesHeader.text(
+                Component.translatable("shortcuts_panel.favorites", this.chips.size()));
         if (this.favoritesScroll != null) {
             this.relayout();
             this.favoritesScroll.restore(progress);
         }
     }
 
-    /** 历史栏右键移除 */
     public void removeHistory(BindEntry entry, BindRowComponent row) {
         double progress = this.historyScroll == null ? 0 : this.historyScroll.progress();
 
@@ -670,31 +601,23 @@ public final class ShortcutsPanelScreen extends UiScreen {
         if (this.historyList.children().isEmpty()) {
             this.historyList.child(dimLabel("shortcuts_panel.history.empty"));
         }
-        this.historyHeader.text(Component.translatable("shortcuts_panel.history", this.history.size()));
+        this.historyHeader.text(
+                Component.translatable("shortcuts_panel.history", this.history.size()));
         if (this.historyScroll != null) {
             this.relayout();
             this.historyScroll.restore(progress);
         }
     }
 
-    // -------------------------------------------------------------- 拖拽排序
-
     public void beginDrag(FavoriteChipComponent chip) {
         this.dragChip = chip;
     }
 
-    /** 把正在拖动的项插到鼠标所在的位置 */
     public void dragTo(FavoriteChipComponent chip, int mouseY) {
         var children = this.favoritesList.children();
         int from = children.indexOf(chip);
         if (from < 0) return;
 
-        // 一次只跟相邻的一项交换：鼠标一进入下一项（越过它的上边框）就往下换，
-        // 一进入上一项（越过它的下边框）就往上换。跟手，不用等过中线。
-        //
-        // 会不会来回翻？不会：换完之后被拖项正好落在鼠标所在的那格，
-        // 此时"下一项"还在更下方、"上一项"的底边还在更上方，两个条件都不成立。
-        // 边界值用 >= 配 < 也正好互补，不会在接缝上抖动。
         int to = from;
 
         if (from + 1 < children.size()) {
@@ -709,8 +632,6 @@ public final class ShortcutsPanelScreen extends UiScreen {
 
         int insertAt = to;
 
-        // 收藏栏可能因为搜索词只显示了一部分，可见顺序不等于落盘顺序。
-        // 这里先在"可见项"里算出新顺序，再只重排它们在数据层占的槽位。
         var visible = new ArrayList<String>(children.size());
         for (UIComponent other : children) {
             if (other instanceof FavoriteChipComponent otherChip && otherChip != chip) {
@@ -742,16 +663,13 @@ public final class ShortcutsPanelScreen extends UiScreen {
         BindTrigger.request(entry);
     }
 
-    /** 打开按键捕获界面，把该条目绑到玩家按下的键 / 鼠标键上 */
     public void startKeyCapture(BindEntry entry) {
-        // MaLiLib 系没有 KeyMapping，改不了键
         if (entry == null || entry.isMalilib()) return;
 
         var client = Minecraft.getInstance();
-        com.shortcutspanel.client.compat.Compat.get().setScreen(client, new KeyCaptureScreen(entry, this));
+        com.shortcutspanel.client.compat.Compat.get()
+                .setScreen(client, new KeyCaptureScreen(entry, this));
     }
-
-    // ------------------------------------------------------------------ 输入
 
     @Override
     public boolean keyPressed(KeyEvent input) {
@@ -759,12 +677,10 @@ public final class ShortcutsPanelScreen extends UiScreen {
             this.altHeld = true;
             this.syncFastScroll();
         }
-        // Esc 一次就关面板。不再做"先清空搜索框、再按才关"：清空有 Ctrl+退格就够了，
-        // 两段关闭只会让人以为第一次按没反应。放在前面是为了不让它落进搜索框的输入处理
         if (input.isEscape()) return super.keyPressed(input);
-        // 编辑键（退格、光标移动、Home/End、Ctrl+A 全选、Ctrl+C/X/V、双击选词…）
-        // 全部交给原版 EditBox，这里不再自己实现一套
-        if (this.searchBox != null && this.searchBox.isFocused() && this.searchBox.onKeyPress(input)) {
+        if (this.searchBox != null
+                && this.searchBox.isFocused()
+                && this.searchBox.onKeyPress(input)) {
             return true;
         }
         if (input.isUp()) {
@@ -775,9 +691,9 @@ public final class ShortcutsPanelScreen extends UiScreen {
             this.moveSelection(1);
             return true;
         }
-        // 回车触发；空格只在搜索框为空时触发，否则留给输入
         if (input.isConfirmation()
-                || (input.key() == InputConstants.KEY_SPACE && this.searchBox.getValue().isEmpty())) {
+                || (input.key() == InputConstants.KEY_SPACE
+                        && this.searchBox.getValue().isEmpty())) {
             if (!this.results.isEmpty()) this.triggerEntry(this.results.get(this.selected));
             return true;
         }
@@ -793,17 +709,14 @@ public final class ShortcutsPanelScreen extends UiScreen {
         return super.keyReleased(input);
     }
 
-    /** 调试用：清空搜索词，让结果栏列出全部条目（好验证滚动） */
     public void debugClearSearch() {
         if (this.searchBox != null) this.searchBox.clear();
     }
 
-    /** 调试用：直接设搜索词，好检查文本在框内的位置 */
     public void debugSetSearch(String value) {
         if (this.searchBox != null) this.searchBox.setValue(value);
     }
 
-    /** 调试用：滚到底并打印状态 */
     public void debugScrollToBottom() {
         if (this.resultScroll == null) return;
 
@@ -814,78 +727,101 @@ public final class ShortcutsPanelScreen extends UiScreen {
     }
 
     private String scrollState() {
-        return "rows=" + this.resultList.children().size()
-                + " viewport=" + this.resultScroll.height()
-                + " content=" + this.resultList.height()
-                + " max=" + this.resultScroll.maxScroll()
-                + " offset=" + Math.round(this.resultScroll.scrollOffset());
+        return "rows="
+                + this.resultList.children().size()
+                + " viewport="
+                + this.resultScroll.height()
+                + " content="
+                + this.resultList.height()
+                + " max="
+                + this.resultScroll.maxScroll()
+                + " offset="
+                + Math.round(this.resultScroll.scrollOffset());
     }
 
-    /** 临时：把布局尺寸打到日志，用来定位宽度异常 */
     @Override
     public void relayout() {
         super.relayout();
         if (this.loggedLayout || this.root == null || this.root.width() == 0) return;
         this.loggedLayout = true;
 
-        LOG.info("layout: screen={}x{} root={}x{} inner={}x{}",
-                this.width, this.height, this.root.width(), this.root.height(),
-                this.root.innerWidth(), this.root.innerHeight());
+        LOG.info(
+                "layout: screen={}x{} root={}x{} inner={}x{}",
+                this.width,
+                this.height,
+                this.root.width(),
+                this.root.height(),
+                this.root.innerWidth(),
+                this.root.innerHeight());
         for (var child : this.root.children()) {
-            LOG.info("  child {}x{} @ ({},{}) sizing={}/{} (v={})",
-                    child.width(), child.height(), child.x(), child.y(),
-                    child.horizontalSizing().mode(), child.horizontalSizing().value(),
+            LOG.info(
+                    "  child {}x{} @ ({},{}) sizing={}/{} (v={})",
+                    child.width(),
+                    child.height(),
+                    child.x(),
+                    child.y(),
+                    child.horizontalSizing().mode(),
+                    child.horizontalSizing().value(),
                     child.verticalSizing().mode());
             if (!(child instanceof ParentComponent column) || column.children().isEmpty()) continue;
 
             var first = column.children().get(0);
-            LOG.info("    first {}x{} @ ({},{})", first.width(), first.height(), first.x(), first.y());
+            LOG.info(
+                    "    first {}x{} @ ({},{})",
+                    first.width(),
+                    first.height(),
+                    first.x(),
+                    first.y());
             if (first instanceof ParentComponent row && !row.children().isEmpty()) {
                 var leaf = row.children().get(0);
-                LOG.info("      leaf {}x{} @ ({},{})", leaf.width(), leaf.height(), leaf.x(), leaf.y());
+                LOG.info(
+                        "      leaf {}x{} @ ({},{})",
+                        leaf.width(),
+                        leaf.height(),
+                        leaf.x(),
+                        leaf.y());
             }
         }
     }
 
     @Override
     public boolean isPauseScreen() {
-        // 单机游戏里打开面板不暂停世界
         return false;
     }
 
-    /** Alt 状态变化时同步给三个滚动容器（Screen.tick 在 26.x 里不一定被调用） */
     private void syncFastScroll() {
-        for (var scroll : new ScrollContainer[]{this.historyScroll, this.resultScroll, this.favoritesScroll}) {
+        for (var scroll :
+                new ScrollContainer[] {
+                    this.historyScroll, this.resultScroll, this.favoritesScroll
+                }) {
             if (scroll != null) scroll.fastScroll(this.altHeld, ALT_SCROLL_FACTOR);
         }
     }
 
-    /** 聚焦态：输入框描边换成强调色，键盘用户才知道焦点在哪 */
     private void updateSearchFocus(boolean focused) {
         if (this.searchField == null) return;
-        this.searchField.surface(Surface.flat(Theme.FIELD)
-                .and(Surface.outline(focused ? Theme.ACCENT : Theme.BORDER)));
+        this.searchField.surface(
+                Surface.flat(Theme.FIELD)
+                        .and(Surface.outline(focused ? Theme.ACCENT : Theme.BORDER)));
     }
 
     private void focusSearchBox() {
         if (this.searchBox != null) this.focus(this.searchBox);
     }
 
-    /**
-     * 面板里只有搜索框能打字，所以即使它当前没聚焦（比如刚点过列表），
-     * 敲下的字符也应该回到它那里，而不是什么都没发生。
-     */
     @Override
     public boolean charTyped(net.minecraft.client.input.CharacterEvent input) {
         if (this.searchBox != null && !this.searchBox.isFocused()) this.focusSearchBox();
         return super.charTyped(input);
     }
 
-    /** 点搜索框所在这一行的任意位置都聚焦到输入框 */
     @Override
-    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubled) {
+    public boolean mouseClicked(
+            net.minecraft.client.input.MouseButtonEvent event, boolean doubled) {
         boolean handled = super.mouseClicked(event, doubled);
-        if (!handled && this.searchField != null && this.searchField.isInBoundingBox(event.x(), event.y())) {
+        if (!handled
+                && this.searchField != null
+                && this.searchField.isInBoundingBox(event.x(), event.y())) {
             this.focusSearchBox();
             return true;
         }

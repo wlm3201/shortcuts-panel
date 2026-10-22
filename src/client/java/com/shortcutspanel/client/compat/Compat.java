@@ -1,9 +1,5 @@
 package com.shortcutspanel.client.compat;
 
-/**
- * 加载当前 MC 版本提供的 {@link GameCompat} 实现。
- * 用反射按约定类名加载，这样共享源码里不需要引用任何版本专属类。
- */
 public final class Compat {
 
     private static final String IMPL_CLASS = "com.shortcutspanel.client.compat.GameCompatImpl";

@@ -1,27 +1,19 @@
 package com.shortcutspanel.client.ui;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import com.shortcutspanel.ui.CursorStyle;
-import com.shortcutspanel.ui.UIComponent;
-import com.shortcutspanel.ui.UiGraphics;
+import com.shortcutspanel.client.uikit.CursorStyle;
+import com.shortcutspanel.client.uikit.UIComponent;
+import com.shortcutspanel.client.uikit.UiGraphics;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
-/**
- * 清空按钮：要<strong>点两次</strong>。
- *
- * <p>第一次点击只是进入"待确认"（描边和文字变红，提示再点一次），再点一次才真的执行。
- * 清空是不可撤销的，一步到位太容易误触。
- *
- * <p>进入待确认后如果一段时间没动作会自动退回，免得一直红着。
- */
 public final class ClearButtonComponent extends UIComponent {
 
-    /** 待确认状态保留多久后自动取消 */
     private static final long CONFIRM_WINDOW_MS = 3000;
 
     private static final Component LABEL_IDLE = Component.translatable("shortcuts_panel.clear");
-    private static final Component LABEL_ARMED = Component.translatable("shortcuts_panel.clear.confirm");
+    private static final Component LABEL_ARMED =
+            Component.translatable("shortcuts_panel.clear.confirm");
 
     private Runnable onConfirm = () -> {};
     private boolean armed;
@@ -47,16 +39,22 @@ public final class ClearButtonComponent extends UIComponent {
         }
 
         boolean hovered = this.isHovered();
-        context.fill(left, top, left + this.width(), top + this.height(),
+        context.fill(
+                left,
+                top,
+                left + this.width(),
+                top + this.height(),
                 hovered ? Theme.BUTTON_HOVER : Theme.BUTTON);
 
-        // × 跟边框同一个配色：待确认才红，悬停青绿，平时和边框一样半透明
         int ink = this.armed ? Theme.DANGER : (hovered ? Theme.ACCENT : Theme.BORDER);
         context.outline(left, top, this.width(), this.height(), ink);
 
-        // × 和边框一样用矩形拼：字体里的 × 字形在这个尺寸下太小，看着不像按钮
-        context.cross(left + this.width() / 2, top + this.height() / 2,
-                Theme.CLEAR_ICON_SIZE, Theme.CLEAR_ICON_THICKNESS, ink);
+        context.cross(
+                left + this.width() / 2,
+                top + this.height() / 2,
+                Theme.CLEAR_ICON_SIZE,
+                Theme.CLEAR_ICON_THICKNESS,
+                ink);
     }
 
     @Override
@@ -82,7 +80,6 @@ public final class ClearButtonComponent extends UIComponent {
 
     @Override
     public boolean canFocus() {
-        // 不抢焦点：点它之后搜索框应该还能继续打字
         return false;
     }
 }
